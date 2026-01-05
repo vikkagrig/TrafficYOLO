@@ -5,6 +5,7 @@ import cv2
 from ultralytics import YOLO
 import time
 from roundButton import create_rounded_button
+from Detected import detect_traffic_light_state
 
 model = None
 image = None
@@ -63,7 +64,7 @@ def open_image():
         messagebox.showerror("Ошибка", "Не удалось открыть изображение")
 
 
-def detect_traffic_light():
+def detect_red_traffic_light():
     global image, detected_image, original_cv2
 
     if original_cv2 is None:
@@ -75,34 +76,38 @@ def detect_traffic_light():
         return
 
     try:
-        img_preprocessed = preprocess_image(original_cv2, kernel_size=3)
         start_time = time.time()
-        results = model(img_preprocessed, classes=[9], verbose=False)
+        results = model(original_cv2, classes=[9], verbose=False)  # только светофоры
         elapsed_time = time.time() - start_time
+
         annotated_cv2 = original_cv2.copy()
+        red_lights = 0
 
         boxes = results[0].boxes
-        if len(boxes) == 0:
-            status_label.config(text="Светофор не найден", fg="#ffb347")
-            show_image(image, canvas_after)
-            detected_image = image.copy()
-            return
-
         for box in boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0])
-            cv2.rectangle(annotated_cv2, (x1, y1), (x2, y2), (0, 250, 0), 3)
+            roi = original_cv2[y1:y2, x1:x2]
+
+            if detect_traffic_light_state(roi) == "red":
+                cv2.rectangle(annotated_cv2, (x1, y1), (x2, y2), (0, 0, 255), 3)  # красная рамка
+                cv2.putText(annotated_cv2, "RED", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                red_lights += 1
 
         annotated_rgb = cv2.cvtColor(annotated_cv2, cv2.COLOR_BGR2RGB)
         pil_result = Image.fromarray(annotated_rgb)
-
         detected_image = pil_result.copy()
         show_image(pil_result, canvas_after)
 
-        found_count = len(boxes)
-        status_label.config(text=f"Найдено светофоров: {found_count}", fg="lightgreen")
-        print(f"Время {elapsed_time:.3f} секунд")
+        if red_lights == 0:
+            status_label.config(text="Красных светофоров не найдено", fg="#ffb347")
+        else:
+            status_label.config(text=f"Найдено красных светофоров: {red_lights}", fg="lightgreen")
+
+        print(f"Детекция за {elapsed_time:.3f} секунд")
 
     except Exception as e:
+        print(f"Ошибка детекции: {e}")
         messagebox.showerror("Ошибка", "Не удалось выполнить детекцию")
 
 
@@ -226,7 +231,7 @@ root.option_add('*TCombobox*Listbox.selectForeground', BTN_FG)
 btn_open_canvas = create_rounded_button(top_frame, "Открыть изображение", open_image, BG_COLOR, BTN_BG, BTN_FG, BTN_HOVER)
 btn_open_canvas.pack(side="left", padx=(0, 15))
 
-btn_detect_canvas = create_rounded_button(top_frame, "Найти светофор", detect_traffic_light, BG_COLOR, BTN_BG, BTN_FG, BTN_HOVER)
+btn_detect_canvas = create_rounded_button(top_frame, "Найти светофор", detect_red_traffic_light, BG_COLOR, BTN_BG, BTN_FG, BTN_HOVER)
 btn_detect_canvas.pack(side="left", padx=(0, 15))
 
 btn_save_canvas = create_rounded_button(top_frame, "Сохранить результат", save_result, BG_COLOR, BTN_BG, BTN_FG, BTN_HOVER)
