@@ -5,7 +5,7 @@ import cv2
 from ultralytics import YOLO
 import time
 from roundButton import create_rounded_button
-from Detected import detect_cars_over_stop_line
+from Detected import detect_cars_over_stop_line, detect_traffic_light_state
 
 model = None
 image = None
@@ -247,12 +247,16 @@ def detect_cars_over_stop_line_ui():
         start_time = time.time()
         
         # Обнаруживаем машины
-        results = model(img_preprocessed, classes=[2], verbose=False)
+        car_results_model = model(img_preprocessed, classes=[2], verbose=False)
+        
+        # Обнаруживаем светофоры
+        traffic_light_results = model(img_preprocessed, classes=[9], verbose=False)
+        
         elapsed_time = time.time() - start_time
         annotated_cv2 = original_cv2.copy()
 
-        boxes = results[0].boxes
-        if len(boxes) == 0:
+        car_boxes_list = car_results_model[0].boxes
+        if len(car_boxes_list) == 0:
             status_label.config(text="Машина не найдена", fg="#ffb347")
             show_image(image, canvas_after)
             detected_image = image.copy()
@@ -260,9 +264,36 @@ def detect_cars_over_stop_line_ui():
 
         # Получаем координаты машин
         car_boxes = []
-        for box in boxes:
+        for box in car_boxes_list:
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             car_boxes.append((x1, y1, x2, y2))
+
+        # Определяем состояние светофоров
+        traffic_light_state = "unknown"
+        traffic_light_boxes = traffic_light_results[0].boxes
+        
+        if len(traffic_light_boxes) > 0:
+            # Берем первый найденный светофор
+            tl_box = traffic_light_boxes[0]
+            tl_x1, tl_y1, tl_x2, tl_y2 = map(int, tl_box.xyxy[0])
+            
+            # Извлекаем ROI светофора
+            tl_roi = original_cv2[tl_y1:tl_y2, tl_x1:tl_x2]
+            
+            # Определяем состояние светофора
+            traffic_light_state = detect_traffic_light_state(tl_roi)
+            
+            # Рисуем светофор
+            color_map = {
+                "red": (0, 0, 255),
+                "yellow": (0, 255, 255),
+                "green": (0, 255, 0),
+                "unknown": (128, 128, 128)
+            }
+            tl_color = color_map.get(traffic_light_state, (128, 128, 128))
+            cv2.rectangle(annotated_cv2, (tl_x1, tl_y1), (tl_x2, tl_y2), tl_color, 3)
+            cv2.putText(annotated_cv2, f"TRAFFIC LIGHT: {traffic_light_state.upper()}", 
+                       (tl_x1, tl_y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, tl_color, 2)
 
         # Проверяем машины относительно выбранной стоп-линии
         car_results = detect_cars_over_stop_line(car_boxes, stop_line_points)
@@ -274,18 +305,34 @@ def detect_cars_over_stop_line_ui():
         cv2.putText(annotated_cv2, "STOP LINE", (stop_line_points[0][0], stop_line_points[0][1] - 10), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-        # Рисуем машины с разными цветами в зависимости от того, пересекают ли они стоп-линию
+        # Рисуем машины с учетом состояния светофора
         cars_over_count = 0
         for i, result in enumerate(car_results):
             x1, y1, x2, y2 = result['box']
             is_over = result['is_over']
             
+            # Определяем нарушение: машина на стоп-линии И светофор красный
+            is_violation = False
             if is_over:
-                # Красный цвет для машин, пересекающих стоп-линию или стоящих сразу за ней
+                if traffic_light_state == "red":
+                    # Красный свет + машина на стоп-линии = нарушение
+                    is_violation = True
+                elif traffic_light_state == "green":
+                    # Зеленый свет + машина на стоп-линии = не нарушение
+                    is_violation = False
+                else:
+                    # Неизвестное состояние или светофор не найден - используем старую логику
+                    is_violation = True
+            
+            if is_violation:
+                # Красный цвет для машин-нарушителей
                 cv2.rectangle(annotated_cv2, (x1, y1), (x2, y2), (0, 0, 255), 3)
                 cv2.putText(annotated_cv2, "VIOLATION", (x1, y1 - 10), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
                 cars_over_count += 1
+            elif is_over:
+                # Зеленый цвет для машин на стоп-линии при зеленом свете
+                cv2.rectangle(annotated_cv2, (x1, y1), (x2, y2), (0, 250, 0), 3)
             else:
                 # Зелёный цвет для машин, не пересекающих стоп-линию
                 cv2.rectangle(annotated_cv2, (x1, y1), (x2, y2), (0, 250, 0), 3)
@@ -296,8 +343,9 @@ def detect_cars_over_stop_line_ui():
         detected_image = pil_result.copy()
         show_image(pil_result, canvas_after)
 
+        traffic_light_info = f", светофор: {traffic_light_state.upper()}" if traffic_light_state != "unknown" else ""
         status_label.config(
-            text=f"Найдено машин: {len(boxes)}, пересекают стоп-линию: {cars_over_count}", 
+            text=f"Найдено машин: {len(car_boxes_list)}, нарушений: {cars_over_count}{traffic_light_info}", 
             fg="lightgreen" if cars_over_count == 0 else "#ff6b6b"
         )
         print(f"Время {elapsed_time:.3f} секунд")
