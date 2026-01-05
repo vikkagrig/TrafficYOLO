@@ -57,7 +57,7 @@ def open_image():
 
         show_image(pil_img, canvas_before)
         clear_canvas(canvas_after)
-        status_label.config(text="Изображение загружено. Нажмите 'Найти светофор'", fg="#b993d6")
+        status_label.config(text="Изображение загружено. Нажмите 'Найти светофор' или 'Найти машину'", fg="#b993d6")
 
     except Exception as e:
         messagebox.showerror("Ошибка", "Не удалось открыть изображение")
@@ -106,6 +106,48 @@ def detect_traffic_light():
         messagebox.showerror("Ошибка", "Не удалось выполнить детекцию")
 
 
+def detect_car():
+    global image, detected_image, original_cv2
+
+    if original_cv2 is None:
+        messagebox.showwarning("Внимание", "Сначала загрузите изображение!")
+        return
+
+    if model is None:
+        messagebox.showwarning("Внимание", "Модель ещё не загружена!")
+        return
+
+    try:
+        img_preprocessed = preprocess_image(original_cv2, kernel_size=3)
+        start_time = time.time()
+        results = model(img_preprocessed, classes=[2], verbose=False)
+        elapsed_time = time.time() - start_time
+        annotated_cv2 = original_cv2.copy()
+
+        boxes = results[0].boxes
+        if len(boxes) == 0:
+            status_label.config(text="Машина не найдена", fg="#ffb347")
+            show_image(image, canvas_after)
+            detected_image = image.copy()
+            return
+
+        for box in boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            cv2.rectangle(annotated_cv2, (x1, y1), (x2, y2), (0, 250, 0), 3)
+
+        annotated_rgb = cv2.cvtColor(annotated_cv2, cv2.COLOR_BGR2RGB)
+        pil_result = Image.fromarray(annotated_rgb)
+
+        detected_image = pil_result.copy()
+        show_image(pil_result, canvas_after)
+
+        found_count = len(boxes)
+        status_label.config(text=f"Найдено машин: {found_count}", fg="lightgreen")
+        print(f"Время {elapsed_time:.3f} секунд")
+
+    except Exception as e:
+        messagebox.showerror("Ошибка", "Не удалось выполнить детекцию")
+
 
 def show_image(pil_image, canvas):
     canvas_w = canvas.winfo_width()
@@ -146,18 +188,10 @@ def save_result():
         return
 
     try:
-        results = model(original_cv2, classes=[9], verbose=False)
-        annotated = original_cv2.copy()
-        for box in results[0].boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 250, 0), 3)
-
-        is_saved = cv2.imwrite(filepath, annotated)
-        if is_saved:
-            messagebox.showinfo("Успех", "Изображение сохранено")
-            status_label.config(text="Результат сохранён", fg="lightgreen")
-        else:
-            raise Exception()
+        # Сохраняем detected_image напрямую через PIL
+        detected_image.save(filepath)
+        messagebox.showinfo("Успех", "Изображение сохранено")
+        status_label.config(text="Результат сохранён", fg="lightgreen")
 
     except:
         messagebox.showerror("Ошибка", "Не удалось сохранить файл")
@@ -228,6 +262,9 @@ btn_open_canvas.pack(side="left", padx=(0, 15))
 
 btn_detect_canvas = create_rounded_button(top_frame, "Найти светофор", detect_traffic_light, BG_COLOR, BTN_BG, BTN_FG, BTN_HOVER)
 btn_detect_canvas.pack(side="left", padx=(0, 15))
+
+btn_detect_car = create_rounded_button(top_frame, "Найти машину", detect_car, BG_COLOR, BTN_BG, BTN_FG, BTN_HOVER)
+btn_detect_car.pack(side="left", padx=(0, 15))
 
 btn_save_canvas = create_rounded_button(top_frame, "Сохранить результат", save_result, BG_COLOR, BTN_BG, BTN_FG, BTN_HOVER)
 btn_save_canvas.pack(side="left")
