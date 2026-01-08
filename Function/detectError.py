@@ -14,7 +14,7 @@ original_cv2 = None
 stop_line_points = []
 image_scale_info = {}
 
-def load_model(model_path="yolov10n.pt"):
+def load_model(model_path="yolo12n.pt"):
     global model, current_model_name
     try:
         status_label.config(text=f"Загружаем {model_path}...", fg="#b993d6")
@@ -30,9 +30,9 @@ def load_model(model_path="yolov10n.pt"):
 def switch_model(event=None):
     selected = model_selector.get()
     model_map = {
-        "YOLOv10n (быстро)": "yolov10n.pt",
-        "YOLOv10s (баланс)": "yolov10s.pt",
-        "YOLOv10m (точно)": "yolov10m.pt"
+        "YOLO12n (быстро)": "yolo12n.pt",
+        "YOLO12s (баланс)": "yolo12s.pt",
+        "YOLO12m (точно)": "yolo12m.pt"
     }
     if selected in model_map:
         load_model(model_map[selected])
@@ -336,12 +336,12 @@ model_label.pack(side="left", padx=(0, 5))
 
 model_selector = ttk.Combobox(
     top_frame,
-    values=["YOLOv10n (быстро)", "YOLOv10s (баланс)", "YOLOv10m (точно)"],
+    values=["YOLO12n (быстро)", "YOLO12s (баланс)", "YOLO12m (точно)"],
     state="readonly",
     width=18,
     font=("Segoe UI", 10)
 )
-model_selector.set("YOLOv8n (быстро)")
+model_selector.set("YOLO12n (быстро)")
 model_selector.pack(side="left", padx=(0, 15))
 model_selector.bind("<<ComboboxSelected>>", switch_model)
 
@@ -366,7 +366,7 @@ btn_open_canvas = create_rounded_button(top_frame, "Открыть изобра�
                                         BTN_HOVER)
 btn_open_canvas.pack(side="left", padx=(0, 15))
 
-btn_check_stop_line = create_rounded_button(top_frame, "Обнаружить нарушение", detect_cars_over_stop_line_ui, BG_COLOR,
+btn_check_stop_line = create_rounded_button(top_frame, "Обнаружить нарушение", detect_cars_over_stop_line, BG_COLOR,
                                             BTN_BG, BTN_FG, BTN_HOVER)
 btn_check_stop_line.pack(side="left", padx=(0, 15))
 
@@ -407,5 +407,5 @@ right_frame.pack(side="right", fill="both", expand=True, padx=(10, 0))
 canvas_after = tk.Canvas(right_frame, bg="#2d2d3a", highlightthickness=0)
 canvas_after.pack(fill="both", expand=True, padx=5, pady=5)
 
-root.after(100, lambda: load_model("yolov10m.pt"))
+root.after(100, lambda: load_model("yolo12s.pt"))
 root.mainloop()
