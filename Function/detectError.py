@@ -5,7 +5,7 @@ import cv2
 from ultralytics import YOLO
 import time
 from roundButton import create_rounded_button
-from Detected import detect_cars_over_stop_line, detect_traffic_light_state
+from Detected import detect_cars_over_stopline, detect_traffic_light_state
 
 model = None
 image = None
@@ -14,7 +14,7 @@ original_cv2 = None
 stop_line_points = []
 image_scale_info = {}
 
-def load_model(model_path="yolo12n.pt"):
+def load_model(model_path="yolo11n.pt"):
     global model, current_model_name
     try:
         status_label.config(text=f"Загружаем {model_path}...", fg="#b993d6")
@@ -30,9 +30,9 @@ def load_model(model_path="yolo12n.pt"):
 def switch_model(event=None):
     selected = model_selector.get()
     model_map = {
-        "YOLO12n (быстро)": "yolo12n.pt",
-        "YOLO12s (баланс)": "yolo12s.pt",
-        "YOLO12m (точно)": "yolo12m.pt"
+        "YOLO11n (быстро)": "yolo11n.pt",
+        "YOLO11s (баланс)": "yolo11s.pt",
+        "YOLO11m (точно)": "yolo11m.pt"
     }
     if selected in model_map:
         load_model(model_map[selected])
@@ -192,7 +192,7 @@ def detect_cars_over_stop_line():
             cv2.putText(annotated_cv2, f"TRAFFIC LIGHT: {traffic_light_state.upper()}",
                         (tl_x1, tl_y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, tl_color, 2)
 
-        car_results = detect_cars_over_stop_line(car_boxes, stop_line_points)
+        car_results = detect_cars_over_stopline(car_boxes, stop_line_points)
 
         cv2.line(annotated_cv2, stop_line_points[0], stop_line_points[1], (0, 0, 255), 3)
         cv2.circle(annotated_cv2, stop_line_points[0], 5, (0, 0, 255), -1)
@@ -336,12 +336,12 @@ model_label.pack(side="left", padx=(0, 5))
 
 model_selector = ttk.Combobox(
     top_frame,
-    values=["YOLO12n (быстро)", "YOLO12s (баланс)", "YOLO12m (точно)"],
+    values=["YOLO11n (быстро)", "YOLO11s (баланс)", "YOLO11m (точно)"],
     state="readonly",
     width=18,
     font=("Segoe UI", 10)
 )
-model_selector.set("YOLO12n (быстро)")
+model_selector.set("YOLO11n (быстро)")
 model_selector.pack(side="left", padx=(0, 15))
 model_selector.bind("<<ComboboxSelected>>", switch_model)
 
@@ -407,5 +407,5 @@ right_frame.pack(side="right", fill="both", expand=True, padx=(10, 0))
 canvas_after = tk.Canvas(right_frame, bg="#2d2d3a", highlightthickness=0)
 canvas_after.pack(fill="both", expand=True, padx=5, pady=5)
 
-root.after(100, lambda: load_model("yolo12s.pt"))
+root.after(100, lambda: load_model("yolo11n.pt"))
 root.mainloop()

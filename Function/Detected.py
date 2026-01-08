@@ -261,7 +261,7 @@ def check_car_over_stop_line(car_boxes, stop_line_points, threshold=50):
     return results
 
 
-def detect_cars_over_stop_line(car_boxes, stop_line_points):
+def detect_cars_over_stopline(car_boxes, stop_line_points):
     """
     Определяет машины, заехавшие за стоп-линию, заданную двумя точками.
     
